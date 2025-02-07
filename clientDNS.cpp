@@ -16,6 +16,7 @@
 using namespace std;
 
 void formatDNSName(unsigned char *dns, const char *host);
+int parseDNSReply(unsigned char *reply, int replyLen);
 
 int main(int argc, char *argv[]) {
     if(argc < 2) {
@@ -73,8 +74,6 @@ int main(int argc, char *argv[]) {
         cout << "Erro ao enviar pacote DNS." << endl;
         close(sock);
         return 1;
-    } else {
-        cout << "DNS REQUEST enviado com sucesso!" << endl;
     }
 
     // Receber o REPLY
@@ -84,21 +83,21 @@ int main(int argc, char *argv[]) {
         cout << "Erro ao receber resposta." << endl;
         close(sock);
         return 1;
-    } else {
-        cout << "DNS REPLY recebido com sucesso!" << endl;
     }
 
     
 
     // Interpretar o REPLY
-    int jumpToResp = 12 + tamQuery + 4;
-    int jumpToIp = jumpToResp + 10;
+    int ipAddr = parseDNSReply(dnsPacket, sizeof(dnsPacket));
+    if(ipAddr != -1) {
+        struct in_addr addr;
+        addr.s_addr = ipAddr;
+        cout << "IP de " << hostname << ": " << inet_ntoa(addr) << endl;
+    } else {
+        cout << "Nao foi possivel encontrar o IP." << endl;
+    }
 
-    struct in_addr ip_addr;
-    memcpy(&ip_addr, &dnsPacket[jumpToIp], 4);
-
-    cout << "IP de " << hostname << ": " << inet_ntoa(ip_addr) << endl;
-
+    close(sock);
 
     return 0;
 }
@@ -115,4 +114,77 @@ void formatDNSName(unsigned char *dns, const char *host) {
         }
     }
     *dns = '\0'; // finaliza o formato DNS
+}
+
+int parseDNSReply(unsigned char *reply, int replyLen) {
+    int ipAddr = -1;
+
+    // verifica quantidade de registros validos
+    if(replyLen < 12) {
+        return ipAddr; // reply invalido
+    }
+
+    // checar numero de respostas no ANCOUNT (7o e 8o byte)
+    int numAnswer = (reply[6] << 8) | reply[7];
+    if (numAnswer == 0) {
+        return ipAddr; // nenhuma resposta encontrada
+    }
+
+
+    // pula header
+    int offset = 12;
+
+
+
+    // pular QNAME em question
+    while(reply[offset] != 0) {
+        if((reply[offset] & 0xC0) == 0xC0) {
+            // ponteiro encontrado
+            offset += 2;
+            break;
+        } else {
+            offset =+ reply[offset] + 1;
+        }
+    }
+    offset += 1; // avança o 0x00 que marca o fim do QNAME
+    
+    offset += 4; // pular QTYPE e QCLASS
+
+    // processar cada resposta
+
+    for(int i = 0; i < numAnswer; i++) {
+        // pular nome de dominio na resposta (ponteiro)
+        if((reply[offset] & 0xC0) == 0xC0) {
+            offset += 2;
+        } else {
+            while(reply[offset] != 0) {
+                offset += reply[offset] + 1;
+            }
+            offset++;
+        }
+
+        // Ler TYPE e CLASS (2 bytes cada)
+        int type = (reply[offset] << 8) | reply[offset + 1];
+        offset += 4;
+
+        // Pular TTL (4 bytes)
+        offset += 4;
+
+        // Ler o comprimento do registro (2 bytes)
+        int dataLen = (reply[offset] << 8) | reply[offset + 1];
+        offset += 2;
+
+        // se o TYPE for A (0x0001) e o tamanho for 4 bytes (IPv4)
+        if(type == 0x0001 && dataLen == 4) {
+            // extrair IP
+            struct in_addr addr;
+            memcpy(&addr, &reply[offset], 4);
+            ipAddr = addr.s_addr;
+            return ipAddr; // retorna o primeiro IP encontrado
+        }
+
+        offset += dataLen; // pular o restante do registro se nao for endereço IPv4
+    }
+
+    return ipAddr; // retorna -1 se nao encotrar
 }
