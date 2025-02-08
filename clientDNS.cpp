@@ -67,9 +67,6 @@ int main(int argc, char *argv[]) {
     // TAMANHO TOTAL DO PACOTE (header + QNAME + 4)
     int packetSize = 12 + tamQuery + 4; // byte nulo após qname
 
-
-
-
     // Enviar a QUERY
     // sendto(sock, buffer, quantidade de bytes do request, flags, * para struct server, tamanho da struct);
     if(sendto(sock, dnsPacket, packetSize, 0, (struct sockaddr*)&saddr, sizeof(saddr)) < 0) {
@@ -87,7 +84,6 @@ int main(int argc, char *argv[]) {
         close(sock);
         return 1;
     }
-
 
     // depuração <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -107,13 +103,7 @@ int main(int argc, char *argv[]) {
     int rcode = flags & 0x000F;
     if(rcode != 0) {
         cout << "Erro no servidor DNS. Codigo RCODE: " << rcode << endl;
-    }
-
-
-
-
-
-    
+    }    
 
     // Interpretar o REPLY
     int ipAddr = parseDNSReply(dnsPacket, sizeof(dnsPacket));
@@ -160,11 +150,8 @@ int parseDNSReply(unsigned char *reply, int replyLen) {
         return ipAddr; // nenhuma resposta encontrada
     }
 
-
     // pula header
     int offset = 12;
-
-
 
     // pular QNAME em question
     while(reply[offset] != 0) {

@@ -23,7 +23,6 @@ int main() {
 
     listen(server, 5);
 
-    
     socklen_t csize = sizeof(caddr);
     int client;
     char buff[150];
@@ -37,7 +36,6 @@ int main() {
 
         close(client);
     }
-
 
     return 0;
 }
