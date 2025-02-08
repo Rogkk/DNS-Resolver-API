@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in saddr;
     saddr.sin_family    = AF_INET; // comunicação por IPv4
     saddr.sin_port      = htons(53); // 53 -> padrão DNS        htons -> converte para formato padrão de rede 
-    saddr.sin_addr.s_addr = inet_addr("8.8.8.8"); // define o IP de destino     inet_addr converte a string para um número de 32bits no formato de rede.
+    saddr.sin_addr.s_addr = inet_addr("10.0.2.3"); // define o IP de destino     inet_addr converte a string para um número de 32bits no formato de rede.
 
     // Construir o DNS REQUEST no array buffer
 
@@ -62,10 +62,10 @@ int main(int argc, char *argv[]) {
     dnsPacket[12 + tamQuery] = 0x00; dnsPacket[13 + tamQuery] = 0x01;
 
     // QCLASS (IN = internet address = 0x0001)
-    dnsPacket[13 + tamQuery] = 0x00; dnsPacket[14 + tamQuery] = 0x01;
+    dnsPacket[14 + tamQuery] = 0x00; dnsPacket[15 + tamQuery] = 0x01;
 
-    // TAMANHO TOTAL DO PACOTE (QNAME + 16)
-    int packetSize = 16 + tamQuery;
+    // TAMANHO TOTAL DO PACOTE (header + QNAME + 4)
+    int packetSize = 12 + tamQuery + 4;
 
 
     // Enviar a QUERY
@@ -79,11 +79,42 @@ int main(int argc, char *argv[]) {
     // Receber o REPLY
     // recvfrom(sock, buffer, tamanho do buffer, flags, * para struct server, * para tamanho da struct);
     socklen_t len = sizeof(saddr);
-    if(recvfrom(sock, dnsPacket, sizeof(dnsPacket), 0, (struct sockaddr*)&saddr, &len) < 0) {
+    int receivedBytes = recvfrom(sock, dnsPacket, sizeof(dnsPacket), 0, (struct sockaddr*)&saddr, &len);
+    if(receivedBytes < 0) {
         cout << "Erro ao receber resposta." << endl;
         close(sock);
         return 1;
     }
+
+
+    // depuração <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    cout << "Pacote recebido (" << receivedBytes << " bytes): ";
+    for(int i = 0; i < receivedBytes; i++) {
+        printf("%02X", dnsPacket[i]);
+    }
+    cout << endl;
+
+    int id = (dnsPacket[0] << 8) | dnsPacket[1];
+    int flags = (dnsPacket[2] << 8) | dnsPacket[3];
+    int qdcount = (dnsPacket[4] << 8) | dnsPacket[5];
+    int ancount = (dnsPacket[6] << 8) | dnsPacket[7];
+    int nscount = (dnsPacket[8] << 8) | dnsPacket[9];
+    int arcount = (dnsPacket[10] << 8) | dnsPacket[11];
+
+    cout << "ID: " << id << " | Flags: " << flags
+         << " | QDCOUNT: " << qdcount
+         << " | ANCOUNT: " << ancount
+         << " | NSCOUNT: " << nscount
+         << " | ARCOUNT: " << arcount << endl;
+
+    int rcode = flags & 0x000F;
+    if(rcode != 0) {
+        cout << "Erro no servidor DNS. Codigo RCODE: " << rcode << endl;
+    }
+
+
+
+
 
     
 
@@ -91,7 +122,7 @@ int main(int argc, char *argv[]) {
     int ipAddr = parseDNSReply(dnsPacket, sizeof(dnsPacket));
     if(ipAddr != -1) {
         struct in_addr addr;
-        addr.s_addr = ipAddr;
+        addr.s_addr = htonl(ipAddr); // converte para o formato de rede
         cout << "IP de " << hostname << ": " << inet_ntoa(addr) << endl;
     } else {
         cout << "Nao foi possivel encontrar o IP." << endl;
@@ -103,14 +134,16 @@ int main(int argc, char *argv[]) {
 }
 
 void formatDNSName(unsigned char *dns, const char *host) {
-    int nc = 0;
+    int len = 0;
     for(int i = 0; i <= strlen(host); i++) {
         if(host[i] == '.' || host[i] == '\0') {
-            *dns++ = i - nc; // escreve no endereço apontado por dns a quantidade de caracteres que virão e avança para proxima posição
-            for(; nc < i; nc++) {
-                *dns++ = host[nc]; // escreve os caracteres
+            *dns++ = len; // escreve no endereço apontado por dns a quantidade de caracteres que virão e avança para proxima posição
+            for(int j = i - len; j < i; j++) {
+                *dns++ = host[j]; // escreve os caracteres
             }
-            nc++; // avança o nc para pular o ponto
+            len = 0;; // reseta contador de comprimento
+        } else {
+            len++; // conta os caracteres até o proximo ponto
         }
     }
     *dns = '\0'; // finaliza o formato DNS
@@ -143,7 +176,7 @@ int parseDNSReply(unsigned char *reply, int replyLen) {
             offset += 2;
             break;
         } else {
-            offset =+ reply[offset] + 1;
+            offset += reply[offset] + 1;
         }
     }
     offset += 1; // avança o 0x00 que marca o fim do QNAME
@@ -178,8 +211,7 @@ int parseDNSReply(unsigned char *reply, int replyLen) {
         if(type == 0x0001 && dataLen == 4) {
             // extrair IP
             struct in_addr addr;
-            memcpy(&addr, &reply[offset], 4);
-            ipAddr = addr.s_addr;
+            ipAddr = (reply[offset] << 24) | (reply[offset+1] << 16) | (reply[offset+2] << 8) | (reply[offset+3]);
             return ipAddr; // retorna o primeiro IP encontrado
         }
 
