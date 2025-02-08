@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in saddr;
     saddr.sin_family    = AF_INET; // comunicação por IPv4
     saddr.sin_port      = htons(53); // 53 -> padrão DNS        htons -> converte para formato padrão de rede 
-    saddr.sin_addr.s_addr = inet_addr("10.0.2.3"); // define o IP de destino     inet_addr converte a string para um número de 32bits no formato de rede.
+    saddr.sin_addr.s_addr = inet_addr("8.8.8.8"); // define o IP de destino     inet_addr converte a string para um número de 32bits no formato de rede.
 
     // Construir o DNS REQUEST no array buffer
 
@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
     unsigned char *queryName = &dnsPacket[12];
     formatDNSName(queryName, hostname);
 
-    int tamQuery = strlen((char*)queryName); // armazena tamanho do QNAME para continuar a construir o PACKET depois dele
+    int tamQuery = strlen((char*)queryName) + 1; // armazena tamanho do QNAME para continuar a construir o PACKET depois dele
 
     // QTYPE (A = host address = 0x0001)
     dnsPacket[12 + tamQuery] = 0x00; dnsPacket[13 + tamQuery] = 0x01;
@@ -65,7 +65,13 @@ int main(int argc, char *argv[]) {
     dnsPacket[14 + tamQuery] = 0x00; dnsPacket[15 + tamQuery] = 0x01;
 
     // TAMANHO TOTAL DO PACOTE (header + QNAME + 4)
-    int packetSize = 12 + tamQuery + 4;
+    int packetSize = 12 + tamQuery + 4; // byte nulo após qname
+
+    cout << "DNS Query enviada: ";
+    for(int i = 0; i < packetSize; i++) {
+        printf("%02X ", dnsPacket[i]);
+    }
+    cout << endl;
 
 
     // Enviar a QUERY
