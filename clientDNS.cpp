@@ -1,8 +1,8 @@
-// Cliente que enviar um DNS REQUEST para um SERVER pré configurado
+// Cliente para enviar um DNS REQUEST para um SERVER pré configurado
 // ETAPAS
 
 // socket
-// connect (only TCP)
+// connect (apenas TCP)
 // write / read
 // close
 
@@ -67,11 +67,7 @@ int main(int argc, char *argv[]) {
     // TAMANHO TOTAL DO PACOTE (header + QNAME + 4)
     int packetSize = 12 + tamQuery + 4; // byte nulo após qname
 
-    cout << "DNS Query enviada: ";
-    for(int i = 0; i < packetSize; i++) {
-        printf("%02X ", dnsPacket[i]);
-    }
-    cout << endl;
+
 
 
     // Enviar a QUERY
@@ -94,11 +90,6 @@ int main(int argc, char *argv[]) {
 
 
     // depuração <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-    cout << "Pacote recebido (" << receivedBytes << " bytes): ";
-    for(int i = 0; i < receivedBytes; i++) {
-        printf("%02X", dnsPacket[i]);
-    }
-    cout << endl;
 
     int id = (dnsPacket[0] << 8) | dnsPacket[1];
     int flags = (dnsPacket[2] << 8) | dnsPacket[3];

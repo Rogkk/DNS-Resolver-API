@@ -1,8 +1,0 @@
-sobre sockets
-
-scaler.com/topics/socket-programming-in-com
-
-
-programando protocolo
-
-blog.pantuza.com/artigos/programando-um-protocolo-utilizando-sockets

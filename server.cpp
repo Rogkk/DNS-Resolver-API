@@ -1,4 +1,4 @@
-// SERVER 
+// ESTRUTURA BÁSICA DO SERVER 
 
 #include <stdio.h>
 #include <stdlib.h>
